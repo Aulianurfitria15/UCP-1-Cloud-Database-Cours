@@ -40,46 +40,67 @@ def ambil_isi_berita(url):
     except Exception as e:
         return f"Gagal akses: {str(e)}"
 
-def crawl_3_data_perbaikan():
+def crawl():
     url_rss = "https://www.cnbcindonesia.com/news/rss"
-    print("📡 Menghubungkan ke RSS...")
+    
+    target_keywords = [
+        'lingkungan', 'iklim', 'emisi', 'karbon', 'esg', 'hijau', 
+        'sustainability', 'energi', 'listrik', 'ev', 'ebt', 'plts', 
+        'hutan', 'polusi', 'sampah', 'keberlanjutan', 'alam'
+    ]
+    
+    print("📡 Mencari berita sesuai tema Environmental Sustainability...")
     
     try:
         response = requests.get(url_rss, headers=headers, timeout=20)
         soup = BeautifulSoup(response.content, 'xml')
-        items = soup.find_all('item')[:3] 
+        items = soup.find_all('item')
         
         results = []
-        for i, item in enumerate(items):
-            link = item.link.text
+        count = 0
+        target_data = 5 
+        
+        for item in items:
+            if count >= target_data:
+                break
+                
             judul = item.title.text
-            print(f"📦 ({i+1}/3) Mendownload: {judul[:40]}...")
+            link = item.link.text
             
-            isi = ambil_isi_berita(link)
-            
-            res_det = requests.get(link, headers=headers, timeout=10)
-            s_det = BeautifulSoup(res_det.text, 'lxml')
-            img = s_det.find('meta', attrs={'property': 'og:image'})
-            
-            data = {
-                'url': link,
-                'judul': judul,
-                'tanggal_publish': item.pubDate.text,
-                'author': "Redaksi CNBC",
-                'tag_kategori': "News",
-                'isi_berita': isi, 
-                'thumbnail': img['content'] if img else None,
-                'scraped_at': time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-            results.append(InsertOne(data))
-            time.sleep(3) 
+            if any(key in judul.lower() for key in target_keywords):
+                print(f"✅ Relevan ({count+1}): {judul[:50]}...")
+                
+                isi = ambil_isi_berita(link)
+                
+                res_det = requests.get(link, headers=headers, timeout=10)
+                s_det = BeautifulSoup(res_det.text, 'lxml')
+                img = s_det.find('meta', attrs={'property': 'og:image'})
+                
+                data = {
+                    'url': link,
+                    'judul': judul,
+                    'tanggal_publish': item.pubDate.text,
+                    'author': "Redaksi CNBC",
+                    'tag_kategori': "Environmental Sustainability", 
+                    'isi_berita': isi, 
+                    'thumbnail': img['content'] if img else None,
+                    'scraped_at': time.strftime("%Y-%m-%d %H:%M:%S")
+                }
+                
+                results.append(InsertOne(data))
+                count += 1
+                time.sleep(3) 
+            else:
+                continue
 
         if results:
             collections.bulk_write(results)
-            print(f"\n✅ BERHASIL! Cek MongoDB Compass kamu sekarang.")
+            print(f"\n🚀 BERHASIL! {len(results)} data tema lingkungan sudah masuk ke MongoDB Atlas.")
+        else:
+            print("\n⚠️ Tidak ada berita lingkungan baru di RSS saat ini. Coba lagi nanti.")
             
     except Exception as e:
         print(f"❌ Error: {e}")
 
 if __name__ == "__main__":
-    crawl_3_data_perbaikan()
+    crawl()
